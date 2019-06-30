@@ -4,6 +4,10 @@ CMake*
 cmake*
 images
 Makefile
+*.pdf
+*.pyc
+python/*.json
+*.h5
 
 # Compiled source #
 ###################

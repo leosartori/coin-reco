@@ -9,7 +9,7 @@ import glob
 import numpy as np
 import train
 
-MODEL_FILENAME = 'model2019-06-29T22:53:13.260338'
+MODEL_FILENAME = 'model2019-06-30T19:40:44.183785'
 PREDICT_PATH = "../images/predict/*"
 
 # getting list of labels
@@ -28,7 +28,7 @@ for myFile in files:
 
     image = cv2.imread(myFile)
     # todo : remove global variable?
-    image = cv2.resize(image, (train.INPUT_SHAPE, train.INPUT_SHAPE))
+    image = cv2.resize(image, (train.INPUT_SIZE, train.INPUT_SIZE))
     image = np.moveaxis(image, -1, 0)
     x_predict.append(image)
 
