@@ -9,14 +9,16 @@ import glob
 import numpy as np
 import train
 
-MODEL_FILENAME = 'model2019-06-29T17:03:21.972832'
+MODEL_FILENAME = 'model2019-06-29T22:53:13.260338'
 PREDICT_PATH = "../images/predict/*"
 
 # getting list of labels
 # todo: remove global variable?
-LABELS = [i for i in os.listdir(train.TRAIN_PATH) if os.path.isdir(i)]
-LABELS.sort()
-print(LABELS)
+
+LABELS = ['1e', '2e', '20c', '50c', 'unknown']
+#LABELS = [i for i in os.listdir(train.TRAIN_PATH) if os.path.isdir(i)]
+#LABELS.sort()
+#print(LABELS)
 
 # load array of images to predict
 x_predict = []
