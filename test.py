@@ -9,14 +9,15 @@ import glob
 import numpy as np
 import csv
 
-import train
+INPUT_SIZE = 224
+TRAIN_PATH = 'images/coins-dataset/classified/train'
 
-MODEL_FILENAME = 'model2019-07-01T07:58:25.026956'
+MODEL_FILENAME = 'model2019-07-01T17:38:24.232001'
 PREDICT_PATH = "images/detect/*"
 
 # getting list of labels
 # todo: remove global variable?
-LABELS = [i for i in os.listdir(train.TRAIN_PATH) if os.path.isdir(os.path.join(train.TRAIN_PATH,i))]
+LABELS = [i for i in os.listdir(TRAIN_PATH) if os.path.isdir(os.path.join(TRAIN_PATH,i))]
 LABELS.sort()
 print(LABELS)
 
@@ -28,7 +29,7 @@ for myFile in files:
 
     image = cv2.imread(myFile)
     # todo : remove global variable?
-    image = cv2.resize(image, (train.INPUT_SIZE, train.INPUT_SIZE))
+    image = cv2.resize(image, (INPUT_SIZE, INPUT_SIZE))
     image = np.moveaxis(image, -1, 0)
     x_predict.append(image)
 

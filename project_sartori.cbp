@@ -72,6 +72,12 @@
 				</MakeCommands>
 			</Target>
 		</Build>
+		<Unit filename="/home/leonardo/Documents/computer_vision/project/include/Recognizer.h">
+			<Option target="project_sartori"/>
+		</Unit>
+		<Unit filename="/home/leonardo/Documents/computer_vision/project/src/Recognizer.cpp">
+			<Option target="project_sartori"/>
+		</Unit>
 		<Unit filename="/home/leonardo/Documents/computer_vision/project/src/main.cpp">
 			<Option target="project_sartori"/>
 		</Unit>

@@ -3,15 +3,20 @@ import os
 
 from keras.models import Sequential
 from keras.layers import Conv2D, MaxPooling2D
-from keras.layers import Activation, Dropout, Flatten, Dense
+from keras.layers import Activation, Dropout, Flatten, Dense, GlobalAveragePooling2D
 from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_array, load_img
 from keras.optimizers import SGD, rmsprop
+
+from keras.applications import MobileNet
+from keras.applications.mobilenet_v2 import MobileNetV2
+from keras.applications.mobilenet import preprocess_input
+from keras.models import Model
 
 from keras import backend as K
 # TODO: investigate ordering in dimensions (to work now it set as Theano, channel first: (3,INPUT_SIZE,INPUT_SIZE))
 K.set_image_dim_ordering('th')
 
-INPUT_SIZE = 150
+INPUT_SIZE = 224
 BATCH_SIZE = 32
 USE_VAL = True
 
@@ -88,6 +93,37 @@ def create_model_cifar(l_num):
     model.add(Activation('softmax'))
     return model
 
+def create_model_zi(l_num):
+
+    model = Sequential()
+
+    model.add(Conv2D(64, (5, 5), padding='same', input_shape=(3, INPUT_SIZE, INPUT_SIZE)))
+    model.add(Activation('relu'))
+
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+
+    model.add(Conv2D(128, (5, 5), padding='same'))
+    model.add(Activation('relu'))
+
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+
+    model.add(Conv2D(256, (3, 3), padding='same'))
+    model.add(Activation('relu'))
+
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+
+    model.add(Conv2D(512, (3, 3), padding='same'))
+    model.add(Activation('relu'))
+
+    model.add(Flatten())
+    model.add(Dense(1024))
+    model.add(Activation('relu'))
+
+    model.add(Dense(l_num))
+    model.add(Activation('softmax'))
+
+    return model
+
 if __name__ == '__main__':
 
     labels_num = sum(os.path.isdir(os.path.join(TRAIN_PATH,i)) for i in os.listdir(TRAIN_PATH))
@@ -96,22 +132,48 @@ if __name__ == '__main__':
     # todo: SGD prevents model from fitting!! (too high lr?)
     #sgd = SGD(lr=0.0001, decay=1e-6, momentum=0.9, nesterov=True)
     rms = rmsprop(lr=0.0001, decay=1e-6)
-    model = create_model_doc(labels_num)
-    model.compile(loss='categorical_crossentropy',
-                  optimizer=rms,
-                  metrics=['accuracy'])
 
-    # this is the augmentation configuration we will use for training
-    train_datagen = ImageDataGenerator(
-        rescale=1./255,
-        zoom_range=0.2,
-        rotation_range=20,
-        horizontal_flip=True,
-        vertical_flip=True
-    )
+    # ------------------ TRANSFER LEARNING ------------------
+
+    base_model=MobileNetV2(weights='imagenet',include_top=False) #imports the mobilenet model and discards the last 1000 neuron layer.
+
+    x=base_model.output
+    x=GlobalAveragePooling2D()(x)
+    x=Dense(1024,activation='relu')(x) #we add dense layers so that the model can learn more complex functions and classify for better results.
+    x=Dense(1024,activation='relu')(x) #dense layer 2
+    x=Dense(512,activation='relu')(x) #dense layer 3
+    preds=Dense(labels_num,activation='softmax')(x) #final layer with softmax activation
+
+    model=Model(inputs=base_model.input,outputs=preds)
+    #specify the inputs
+    #specify the outputs
+    #now a model has been created based on MobileNet architecture
+
+    for layer in model.layers[:20]:
+        layer.trainable=False
+    for layer in model.layers[20:]:
+        layer.trainable=True
+
+    # now use the model as usual
+
+    model.compile(loss='categorical_crossentropy',
+                      optimizer=rms,
+                      metrics=['accuracy'])
 
     # todo: make possible to do data aug or not
     #train_datagen = ImageDataGenerator(rescale=1./255)
+
+    # this is the augmentation configuration we will use for training
+    #train_datagen = ImageDataGenerator(
+    #    rescale=1./255,
+    #    zoom_range=0.2,
+    #    rotation_range=20,
+    #    horizontal_flip=True,
+    #    vertical_flip=True
+    #)
+
+    # use MobileNet preprocessing
+    train_datagen=ImageDataGenerator(preprocessing_function=preprocess_input) #included in our dependencies
 
     # this is a generator that will read pictures found in
     # subfolers of path, and indefinitely generate
@@ -144,10 +206,13 @@ if __name__ == '__main__':
                 class_mode='categorical')
 
         # TRAIN
+
+        step_size_train=train_generator.n//train_generator.batch_size
+
         model.fit_generator(
                 train_generator,
-                steps_per_epoch=1000 // BATCH_SIZE,
-                epochs=300,
+                steps_per_epoch=step_size_train,
+                epochs=20,
                 validation_data=validation_generator,
                 validation_steps=50 // BATCH_SIZE)
     else:
@@ -155,7 +220,7 @@ if __name__ == '__main__':
         model.fit_generator(
             train_generator,
             steps_per_epoch=1000 // BATCH_SIZE,
-            epochs=300,
+            epochs=20,
             validation_data=None,
             validation_steps=50 // BATCH_SIZE)
 
