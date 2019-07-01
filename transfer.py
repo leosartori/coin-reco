@@ -7,10 +7,13 @@ from keras.layers import Activation, Dropout, Flatten, Dense, GlobalAveragePooli
 from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_array, load_img
 from keras.optimizers import SGD, rmsprop
 
-from keras.applications import MobileNet
-from keras.applications.mobilenet_v2 import MobileNetV2
-from keras.applications.mobilenet import preprocess_input
 from keras.models import Model
+
+#from keras.applications.mobilenet_v2 import MobileNetV2
+#from keras.applications.mobilenet_v2 import preprocess_input
+
+from keras.applications.inception_v3 import InceptionV3
+from keras.applications.inception_v3 import preprocess_input
 
 from keras import backend as K
 # TODO: investigate ordering in dimensions (to work now it set as Theano, channel first: (3,INPUT_SIZE,INPUT_SIZE))
@@ -135,12 +138,13 @@ if __name__ == '__main__':
 
     # ------------------ TRANSFER LEARNING ------------------
 
-    base_model=MobileNetV2(weights='imagenet',include_top=False) #imports the mobilenet model and discards the last 1000 neuron layer.
+    #base_model=MobileNetV2(weights='imagenet',include_top=False) #imports the mobilenet model and discards the last 1000 neuron layer.
+    base_model=InceptionV3(weights='imagenet',include_top=False) #imports the Inception model and discards the last 1000 neuron layer.
 
     x=base_model.output
     x=GlobalAveragePooling2D()(x)
     x=Dense(1024,activation='relu')(x) #we add dense layers so that the model can learn more complex functions and classify for better results.
-    x=Dense(1024,activation='relu')(x) #dense layer 2
+    # x=Dense(1024,activation='relu')(x) #dense layer 2
     x=Dense(512,activation='relu')(x) #dense layer 3
     preds=Dense(labels_num,activation='softmax')(x) #final layer with softmax activation
 
@@ -212,7 +216,7 @@ if __name__ == '__main__':
         model.fit_generator(
                 train_generator,
                 steps_per_epoch=step_size_train,
-                epochs=20,
+                epochs=3,
                 validation_data=validation_generator,
                 validation_steps=50 // BATCH_SIZE)
     else:

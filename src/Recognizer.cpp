@@ -1,9 +1,3 @@
-#include <opencv2/core.hpp>
-#include <opencv2/imgproc.hpp>
-#include <opencv2/highgui.hpp>
-#include <iostream>
-#include <fstream>
-#include <string>
 #include <Recognizer.h>
 
 using namespace cv;
@@ -135,6 +129,7 @@ void Recognizer::preprocess() {
 
     // clean the directory used to perform classification by Python script
     system("exec rm -r images/detect/*");
+    system("exec mkdir images/detect/coins");
 
     // To draw and save as images the detected circles.
 
@@ -149,11 +144,22 @@ void Recognizer::preprocess() {
         coins_img.push_back(single_coin);
 
         // Save the coin frame
-        imwrite("images/detect/" + to_string(i) + ".jpg", single_coin);
+        imwrite("images/detect/coins/" + to_string(i) + ".jpg", single_coin);
 
         namedWindow("Coin Crop", WINDOW_NORMAL);
         imshow("Coin Crop", single_coin);
         waitKey(0);
+    }
+
+    cout << "Saving complete!" << endl;
+
+    // draw circles, this must be done after, otherwise we save images with other circles drawn
+    for (size_t i = 0; i < coin.size(); i++) {
+        Point center(cvRound(coin[i][0]), cvRound(coin[i][1]));
+        // Detect center
+        // cvRound: Rounds floating point number to nearest integer.
+        int radius = cvRound(coin[i][2]);
+        // To get the radius from the second argument of vector coin.
 
         circle(image, center, 3, Scalar(0, 255, 0), -1, 8, 0);
         // circle center
