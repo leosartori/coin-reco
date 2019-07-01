@@ -12,6 +12,10 @@
 #include <opencv2/ccalib.hpp>
 #include <opencv2/stitching.hpp>
 
+#include </usr/include/jsoncpp/json/value.h>
+#include <jsoncpp/json/json.h>
+#include <fstream>
+
 using namespace cv;
 // Namespace where all the C++ OpenCV functionality resides.
 
@@ -23,7 +27,8 @@ int main()
     Mat image;
     // Mat object is a basic image container. image is an object of Mat.
 
-    image = imread("images/1.jpg", CV_LOAD_IMAGE_UNCHANGED);
+    // TODO: check this reading, make it possible from command line
+    image = imread("images/samples/1.jpg", CV_LOAD_IMAGE_UNCHANGED);
     // Take any image but make sure its in the same folder.
     // first argument denotes the image to be loaded.
     // second argument specifies the image format as follows:
@@ -141,7 +146,10 @@ int main()
 
     cout<<"\n The number of coins is: "<<l<<"\n\n";
 
-    // To draw the detected circles.
+    // clean the directory used to perform classification by Python script
+    system("exec rm -r images/detect/*");
+
+    // To draw and save as images the detected circles.
 
     vector<Mat> coin_roi(coin.size());
 
@@ -154,6 +162,10 @@ int main()
       // To get the radius from the second argument of vector coin.
 
       coin_roi[i] = image(Rect(center.x - radius, center.y - radius, radius * 2, radius * 2));
+
+      // Save the coin frame
+      imwrite("images/detect/" + to_string(i) + ".jpg", coin_roi[i]);
+
       namedWindow("Coin Crop", WINDOW_NORMAL);
       imshow("Coin Crop", coin_roi[i]);
       waitKey(0);
@@ -184,6 +196,28 @@ int main()
     // second argument: image to be shown(Mat object)
 
     waitKey(0); // Wait for infinite time for a key press.
+
+
+    // ------------------ start classification of cropped coins usign Python script ----------------
+
+    system("python test.py");
+    cout << "Wait for \'test.py\' just 5 seconds, then press Enter on window" << endl;
+    waitKey(0);
+
+    // read predictions from CSV created by test.py
+    vector<String> pred;
+
+    ifstream f("images/detect/pred.csv");
+    if (!f.is_open()) {
+        cout << "error opening file." << endl;
+        return 1;
+    }
+
+    string p;
+    while(std::getline(f, p, ',')) {
+        cout << "p: " << p << endl;
+        pred.push_back(p);
+    }
 
     return 0;    // Return from main function.
 }

@@ -15,8 +15,8 @@ INPUT_SIZE = 150
 BATCH_SIZE = 32
 USE_VAL = True
 
-TRAIN_PATH = '/home/leonardo/Documents/computer_vision/project/images/coins-dataset/classified/train'
-VAL_PATH = '/home/leonardo/Documents/computer_vision/project/images/coins-dataset/classified/test'
+TRAIN_PATH = 'images/coins-dataset/classified/train'
+VAL_PATH = 'images/coins-dataset/classified/test'
 
 # SMALL DEBUG TRAINSET
 # TRAIN_PATH = '/home/leonardo/Documents/computer_vision/project/images/small_train'
@@ -94,22 +94,24 @@ if __name__ == '__main__':
     print ("labels_num: " + str(labels_num))
 
     # todo: SGD prevents model from fitting!! (too high lr?)
-    # sgd = SGD(lr=0.001, decay=1e-6, momentum=0.9, nesterov=True)
+    #sgd = SGD(lr=0.0001, decay=1e-6, momentum=0.9, nesterov=True)
     rms = rmsprop(lr=0.0001, decay=1e-6)
     model = create_model_doc(labels_num)
     model.compile(loss='categorical_crossentropy',
                   optimizer=rms,
                   metrics=['accuracy'])
 
-    # todo: reactivate data aug
     # this is the augmentation configuration we will use for training
-    #train_datagen = ImageDataGenerator(
-    #        rescale=1./255,
-    #        shear_range=0.2,
-    #        zoom_range=0.2,
-    #        horizontal_flip=True)
+    train_datagen = ImageDataGenerator(
+        rescale=1./255,
+        zoom_range=0.2,
+        rotation_range=20,
+        horizontal_flip=True,
+        vertical_flip=True
+    )
 
-    train_datagen = ImageDataGenerator(rescale=1./255)
+    # todo: make possible to do data aug or not
+    #train_datagen = ImageDataGenerator(rescale=1./255)
 
     # this is a generator that will read pictures found in
     # subfolers of path, and indefinitely generate
@@ -125,6 +127,7 @@ if __name__ == '__main__':
     # numpy array containing a batch of images with shape
     # (batch_size, *target_size, channels) and y is a numpy array of corresponding labels
 
+    # DEBUG
     sample_batch = next(train_generator)
     print('Train img shape: ' + str(sample_batch[0].shape))
 
@@ -144,7 +147,7 @@ if __name__ == '__main__':
         model.fit_generator(
                 train_generator,
                 steps_per_epoch=1000 // BATCH_SIZE,
-                epochs=25,
+                epochs=300,
                 validation_data=validation_generator,
                 validation_steps=50 // BATCH_SIZE)
     else:
@@ -152,7 +155,7 @@ if __name__ == '__main__':
         model.fit_generator(
             train_generator,
             steps_per_epoch=1000 // BATCH_SIZE,
-            epochs=25,
+            epochs=300,
             validation_data=None,
             validation_steps=50 // BATCH_SIZE)
 
@@ -165,5 +168,5 @@ if __name__ == '__main__':
         json_file.write(model_json)
 
     # serialize weights to HDF5
-    model.save_weights(model_filename + '.h5')  # always save your weights after training or during training
+    model.save_weights(model_filename + '.h5')
     print("Saved model to disk as " + model_filename)

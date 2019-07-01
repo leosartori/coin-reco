@@ -6,7 +6,7 @@ images
 Makefile
 *.pdf
 *.pyc
-python/*.json
+*.json
 *.h5
 
 # Compiled source #
