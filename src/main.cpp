@@ -78,6 +78,8 @@ int main() {
             value = 0.02 * it->second;
         if (it->first == "1c")
             value = 0.01 * it->second;
+        if (it->first == "unk")
+            value = 0;
 
         // sum total of found euros
         coins_sum += value;

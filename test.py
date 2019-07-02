@@ -21,7 +21,7 @@ import csv
 INPUT_SIZE = 224
 TRAIN_PATH = 'images/coins-dataset/classified/train'
 
-MODEL_FILENAME = 'inc_model2019-07-01T18:45:56.878010'
+MODEL_FILENAME = 'model2019-07-02T23:21:44.710661'
 PREDICT_PATH = "images/detect"
 
 # getting list of labels

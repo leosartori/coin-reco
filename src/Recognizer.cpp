@@ -99,20 +99,14 @@ void Recognizer::hough_preprocess(string path) {
     // HOUGH TRANSFORM
 
     int max_radius = min(image.size().height, image.size().width) / 4;
-    int min_dist = min(image.size().height, image.size().width) / 5.5;
+    int min_dist = min(image.size().height, image.size().width) / 8;
     int min_radius = min_dist * 1.2;
 
-    // OK for more coins with occlusions
-    //HoughCircles(closing,coin,CV_HOUGH_GRADIENT,1,50,1000,10,10,0);
-
-    // PERFECT ON 1.jpg:
-    HoughCircles(edges, coin, CV_HOUGH_GRADIENT, 1, 500, high_thresh_val, 10, 100, max_radius);
-    // DECENT ON everything
-    //HoughCircles(edges, coin, CV_HOUGH_GRADIENT, 1.5, min_dist, high_thresh_val * 3, 30, min_radius, max_radius);
+    HoughCircles(opening, coin, CV_HOUGH_GRADIENT, 1.5, min_dist, high_thresh_val * 3, 20, min_radius, max_radius);
 
     cout << endl << "The number of coins is: " << coin.size() << endl;
     if (coin.size() > MAX_COINS){
-        cout <<"But only stronger " << MAX_COINS << "will be analyzed" << endl << endl;
+        cout <<"But only stronger " << MAX_COINS << " will be analyzed" << endl << endl;
         coin.resize(MAX_COINS);
     }
 
@@ -178,8 +172,6 @@ void Recognizer::save_and_draw(string path){
 
 void Recognizer::ransac_preproc(string path, double canny_threshold, double circle_threshold, int numIterations)
 {
-    // TODO: remove continue
-
     // Edge Detection
     Mat edges;
     Canny(image, edges, MAX(canny_threshold/2,1), canny_threshold, 3);
@@ -259,88 +251,98 @@ void Recognizer::ransac_preproc(string path, double canny_threshold, double circ
         DC = norm(pointD - pointC);
 
         // one or more random points are too close together
-        if(AB < min_point_separation || BC < min_point_separation || CA < min_point_separation || DC < min_point_separation) continue;
+        if(AB < min_point_separation || BC < min_point_separation || CA < min_point_separation || DC < min_point_separation) {
+            cout << "points too close" << endl;
+        }
+        else{
 
-        //find line equations for AB and BC
-        //AB
-        m_AB = (pointB.y - pointA.y) / (pointB.x - pointA.x + 0.000000001); //avoid divide by 0
-        b_AB = pointB.y - m_AB*pointB.x;
+            //find line equations for AB and BC
+            //AB
+            m_AB = (pointB.y - pointA.y) / (pointB.x - pointA.x + 0.000000001); //avoid divide by 0
+            b_AB = pointB.y - m_AB * pointB.x;
 
-        //BC
-        m_BC = (pointC.y - pointB.y) / (pointC.x - pointB.x + 0.000000001); //avoid divide by 0
-        b_BC = pointC.y - m_BC*pointC.x;
+            //BC
+            m_BC = (pointC.y - pointB.y) / (pointC.x - pointB.x + 0.000000001); //avoid divide by 0
+            b_BC = pointC.y - m_BC * pointC.x;
 
 
-        //test colinearity (ie the points are not all on the same line)
-        if(abs(pointC.y - (m_AB*pointC.x + b_AB + colinear_tolerance)) < colinear_tolerance) continue;
-
-        //find perpendicular bisector
-        //AB
-        //midpoint
-        XmidPoint_AB = (pointB.x + pointA.x) / 2.0;
-        YmidPoint_AB = m_AB * XmidPoint_AB + b_AB;
-        //perpendicular slope
-        m2_AB = -1.0 / m_AB;
-        //find b2
-        b2_AB = YmidPoint_AB - m2_AB*XmidPoint_AB;
-
-        //BC
-        //midpoint
-        XmidPoint_BC = (pointC.x + pointB.x) / 2.0;
-        YmidPoint_BC = m_BC * XmidPoint_BC + b_BC;
-        //perpendicular slope
-        m2_BC = -1.0 / m_BC;
-        //find b2
-        b2_BC = YmidPoint_BC - m2_BC*XmidPoint_BC;
-
-        //find intersection = circle center
-        x = (b2_AB - b2_BC) / (m2_BC - m2_AB);
-        y = m2_AB * x + b2_AB;
-        center = Point2d(x,y);
-        radius = norm(center - pointB);
-
-        // check if radius is larger enough
-        if (radius < min_radius) continue;
-
-        //check if the 4 point is on the circle
-        if(abs(norm(pointD - center) - radius) > radius_tolerance) continue;
-
-        // vote
-        vector<int> votes;
-        vector<int> no_votes;
-        for(int i = 0; i < (int)points.size(); i++)
-        {
-            double vote_radius = norm(points[i] - center);
-
-            // the point is at distance similar to radius
-            if(abs(vote_radius - radius) < radius_tolerance)
-            {
-                votes.push_back(i);
+            //test colinearity (ie the points are not all on the same line)
+            if (abs(pointC.y - (m_AB * pointC.x + b_AB + colinear_tolerance)) < colinear_tolerance){
+                cout << "not all on the same line" << endl;
             }
-            else
-            {
-                no_votes.push_back(i);
+            else {
+
+                //find perpendicular bisector
+                //AB
+                //midpoint
+                XmidPoint_AB = (pointB.x + pointA.x) / 2.0;
+                YmidPoint_AB = m_AB * XmidPoint_AB + b_AB;
+                //perpendicular slope
+                m2_AB = -1.0 / m_AB;
+                //find b2
+                b2_AB = YmidPoint_AB - m2_AB * XmidPoint_AB;
+
+                //BC
+                //midpoint
+                XmidPoint_BC = (pointC.x + pointB.x) / 2.0;
+                YmidPoint_BC = m_BC * XmidPoint_BC + b_BC;
+                //perpendicular slope
+                m2_BC = -1.0 / m_BC;
+                //find b2
+                b2_BC = YmidPoint_BC - m2_BC * XmidPoint_BC;
+
+                //find intersection = circle center
+                x = (b2_AB - b2_BC) / (m2_BC - m2_AB);
+                y = m2_AB * x + b2_AB;
+                center = Point2d(x, y);
+                radius = norm(center - pointB);
+
+                // check if radius is larger enough
+                if (radius < min_radius) {
+                    cout << "radius too small" << endl;
+                }
+                else {
+
+                    //check if the 4 point is on the circle
+                    if (abs(norm(pointD - center) - radius) > radius_tolerance){
+                        cout << "not on circle " << endl;
+                    }
+                    else {
+
+                        // vote
+                        vector<int> votes;
+                        vector<int> no_votes;
+                        for (int i = 0; i < (int) points.size(); i++) {
+                            double vote_radius = norm(points[i] - center);
+
+                            // the point is at distance similar to radius
+                            if (abs(vote_radius - radius) < radius_tolerance) {
+                                votes.push_back(i);
+                            } else {
+                                no_votes.push_back(i);
+                            }
+                        }
+
+                        // check votes vs circle_threshold (number of points near the circumference / points on circumference)
+                        if ((float) votes.size() / (2.0 * CV_PI * radius) >= circle_threshold) {
+                            coin.push_back(Vec3f(x, y, radius));
+
+                            // remove points from the set so they can't vote on multiple coin
+                            vector<Point2d> new_points;
+                            for (int i = 0; i < (int) no_votes.size(); i++) {
+                                new_points.push_back(points[no_votes[i]]);
+                            }
+                            points.clear();
+                            points = new_points;
+                        }
+
+                        // stop RANSAC if there are few points left
+                        if ((int) points.size() < points_threshold)
+                            cout << "Too little points remaining, RANSAC unstable: restart reducing iterations" << endl;
+                    }
+                }
             }
         }
-
-        // check votes vs circle_threshold (number of points near the circumference / points on circumference)
-        if( (float)votes.size() / (2.0*CV_PI*radius) >= circle_threshold )
-        {
-            coin.push_back(Vec3f(x,y,radius));
-
-            // remove points from the set so they can't vote on multiple coin
-            vector<Point2d> new_points;
-            for(int i = 0; i < (int)no_votes.size(); i++)
-            {
-                new_points.push_back(points[no_votes[i]]);
-            }
-            points.clear();
-            points = new_points;
-        }
-
-        // stop RANSAC if there are few points left
-        if((int)points.size() < points_threshold)
-            cout << "Too little points remaining, RANSAC unstable: restart reducing iterations" << endl;
     }
 
     cout << "Circles found: " << coin.size() << endl;
