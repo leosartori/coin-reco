@@ -47,6 +47,7 @@ int main() {
     //Get predictions on extracted subimages
     vector<string> pred = rec.predict("images/detect/");
 
+    cout << "------------ DETECTOR RESUME ---------------" << endl;
     //Use map to catalogue type of coins found
     std::map<std::string, int> counter;
     for (auto p : pred) {

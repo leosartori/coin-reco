@@ -21,9 +21,6 @@ from keras.models import Model
 from keras.applications.inception_v3 import InceptionV3
 from keras.applications.inception_v3 import preprocess_input
 
-from keras import backend as K
-K.set_image_dim_ordering('th')
-
 INPUT_SIZE = 224
 BATCH_SIZE = 32
 USE_VAL = True
@@ -40,7 +37,7 @@ VAL_PATH = 'images/coins-dataset/classified/test'
 
 def create_model(l_num):
     model = Sequential()
-    model.add(Conv2D(32, (3, 3), input_shape=(3, INPUT_SIZE, INPUT_SIZE)))
+    model.add(Conv2D(32, (3, 3), input_shape=(INPUT_SIZE, INPUT_SIZE,3)))
     model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size=(2, 2)))
 
@@ -221,7 +218,7 @@ if __name__ == '__main__':
         model.fit_generator(
                 train_generator,
                 steps_per_epoch=step_size_train,
-                epochs=20,
+                epochs=30,
                 validation_data=validation_generator,
                 validation_steps=50 // BATCH_SIZE)
     else:
@@ -229,7 +226,7 @@ if __name__ == '__main__':
         model.fit_generator(
             train_generator,
             steps_per_epoch=1000 // BATCH_SIZE,
-            epochs=20,
+            epochs=30,
             validation_data=None,
             validation_steps=50 // BATCH_SIZE)
 

@@ -23,15 +23,18 @@ Recognizer::Recognizer(string image_path) {
 
     //display the image
     namedWindow("Original", WINDOW_NORMAL);
-    imshow("Original", image_out);
+    imshow("Original", this->image);
+    waitKey(0);
+    cvDestroyWindow("Original");
 
 }
 
 
 void Recognizer::preprocess(int choice, string path){
+    // selection of circle detection method
     switch(choice){
         case 1:
-            hough_preprocess();
+            hough_preprocess(path);
             break;
         case 2:{
             double canny_threshold = 800;
@@ -65,7 +68,8 @@ void Recognizer::hough_preprocess(string path) {
     Mat thresh;
     double otsu_tresh = threshold(gray_blur, thresh, 0, 255, CV_THRESH_BINARY | CV_THRESH_OTSU);
     double high_thresh_val = otsu_tresh, lower_thresh_val = otsu_tresh / 2;
-    cout << "high: " << high_thresh_val << " low: " << lower_thresh_val << endl;
+
+    //cout << "high: " << high_thresh_val << " low: " << lower_thresh_val << endl;
 
     // Alternative to Otsu: adaptive thresholding, divides pixels in above or below variable threshold (black or white)
     // adaptiveThreshold(gray_blur, thresh, 255, ADAPTIVE_THRESH_GAUSSIAN_C, THRESH_BINARY_INV, 11, 1);
@@ -90,6 +94,7 @@ void Recognizer::hough_preprocess(string path) {
     namedWindow("Canny", WINDOW_NORMAL);
     imshow("Canny", edges);
     waitKey(0);
+    destroyWindow("Canny");
 
     // HOUGH TRANSFORM
 
@@ -101,11 +106,15 @@ void Recognizer::hough_preprocess(string path) {
     //HoughCircles(closing,coin,CV_HOUGH_GRADIENT,1,50,1000,10,10,0);
 
     // PERFECT ON 1.jpg:
-    //HoughCircles(edges, coin, CV_HOUGH_GRADIENT, 1, 500, high_thresh_val, 10, 100, max_radius);
+    HoughCircles(edges, coin, CV_HOUGH_GRADIENT, 1, 500, high_thresh_val, 10, 100, max_radius);
     // DECENT ON everything
-    HoughCircles(edges, coin, CV_HOUGH_GRADIENT, 1.5, min_dist, high_thresh_val * 3, 30, min_radius, max_radius);
+    //HoughCircles(edges, coin, CV_HOUGH_GRADIENT, 1.5, min_dist, high_thresh_val * 3, 30, min_radius, max_radius);
 
-    cout << "\n The number of coins is: " << coin.size() << "\n\n";
+    cout << endl << "The number of coins is: " << coin.size() << endl;
+    if (coin.size() > MAX_COINS){
+        cout <<"But only stronger " << MAX_COINS << "will be analyzed" << endl << endl;
+        coin.resize(MAX_COINS);
+    }
 
     if (coin.size() > 0) {
 
@@ -133,14 +142,13 @@ void Recognizer::hough_preprocess(string path) {
 
 void Recognizer::save_and_draw(string path){
 
-    cout << "Saving coins..." << endl;
     for (size_t i = 0; i < coin.size(); i++) {
         // get center
         Point center(cvRound(coin[i][0]), cvRound(coin[i][1]));
         // get the radius
         int radius = cvRound(coin[i][2]);
 
-        // cout << "Circle " << i + 1 << " : " << center << "\n Diameter : " << 2 * radius << "\n";
+        // cout << "Circle " << i + 1 << " : " << center << " Diameter : " << 2 * radius << endl;
 
         // check if subimages are inside the original image (detected circle can go outside it)
         int x1 = max(0, center.x - radius);
@@ -164,6 +172,7 @@ void Recognizer::save_and_draw(string path){
         //imshow("Coin Crop", single_coin);
         //waitKey(0);
     }
+    cout <<"Single coin images saved in " << path << endl;
 }
 
 
@@ -200,13 +209,13 @@ void Recognizer::ransac_preproc(string path, double canny_threshold, double circ
     double CA;
     double DC;
 
-    // varibales for line equations y = mx + b
+    // variables for line equations y = mx + b
     double m_AB;
     double b_AB;
     double m_BC;
     double b_BC;
 
-    // varibles for line midpoints
+    // variables for line midpoints
     double XmidPoint_AB;
     double YmidPoint_AB;
     double XmidPoint_BC;
@@ -220,18 +229,20 @@ void Recognizer::ransac_preproc(string path, double canny_threshold, double circ
 
     // RANSAC
     RNG rng; // random number generator
-    int min_point_separation = 10; // if points randomly chosen are closer than that, skip them
-    int colinear_tolerance = 1; // make sure points are not on a line
-    int radius_tolerance = 10; // tolerance on points considered on the circumference
-    int points_threshold = 500; // prints warning if we are using a number of total points below that
-    double min_radius = 10; //minimum radius for a circle to not be rejected
+    const int min_point_separation = 10; // if points randomly chosen are closer than that, skip them
+    const int colinear_tolerance = 1; // make sure points are not on a line
+    const int radius_tolerance = 10; // tolerance on points considered on the circumference
+    const int points_threshold = 500; // prints warning if we are using a number of total points below that
+    const double min_radius = 10; //minimum radius for a circle to not be rejected
 
+    // used to find intersection
     int x,y;
+    // circle variables
     Point2d center;
     double radius;
 
     // Iterate
-    for(int iteration = 0; iteration < numIterations; iteration++)
+    for(int iteration = 0; (iteration < numIterations) && (coin.size() < MAX_COINS); iteration++)
     {
         //cout << "RANSAC iteration: " << iteration << endl;
 
@@ -329,12 +340,12 @@ void Recognizer::ransac_preproc(string path, double canny_threshold, double circ
 
         // stop RANSAC if there are few points left
         if((int)points.size() < points_threshold)
-            cout << "Too little points remaining, RANSAC unstable: reduce iterations" << endl;
+            cout << "Too little points remaining, RANSAC unstable: restart reducing iterations" << endl;
     }
 
     cout << "Circles found: " << coin.size() << endl;
 
-    if (coin.size() > 0){
+    if (!coin.empty()){
 
         // clean the directory used to perform classification by Python script
         String rm = "exec rm -r " + path + "*";
@@ -355,24 +366,25 @@ void Recognizer::ransac_preproc(string path, double canny_threshold, double circ
 
 vector<string> Recognizer::predict(string path){
 
-    if (coins_img.size() == 0){
+    if (coins_img.empty()){
         cout << "No coins detected, aborting recogniction" << endl;
-        return pred;
-    }
-
-    // run Python script to creates CSV with predictions, about subimages previously found
-    system("python test.py");
-    cout << endl;
-
-    // read predictions from CSV created by test.py
-    ifstream f(path + "pred.csv");
-    if (!f.is_open()) {
-        cout << "error opening file." << endl;
     }
     else{
-        string single_pred;
-        while(getline(f, single_pred, ',')) {
-            pred.push_back(single_pred);
+
+        // run Python script to creates CSV with predictions, about subimages previously found
+        system("python test.py");
+        cout << endl;
+
+        // read predictions from CSV created by test.py
+        ifstream f(path + "pred.csv");
+        if (!f.is_open()){
+            cout << "error opening file." << endl;
+        }
+        else{
+            string single_pred;
+            while(getline(f, single_pred, ',')) {
+                pred.push_back(single_pred);
+            }
         }
     }
 
