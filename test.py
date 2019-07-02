@@ -1,3 +1,12 @@
+#######################################################################
+
+#Coin Detector and Recognizer - Exam of Computer Vision 2018/2019 UNIPD
+
+# @author Leonardo Sartori (leonardo.sartori.1@studenti.unipp.it)
+# @version 1.0
+
+#######################################################################
+
 from keras import backend as K
 K.set_image_dim_ordering('th')
 

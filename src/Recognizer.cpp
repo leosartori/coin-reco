@@ -1,3 +1,10 @@
+/**
+    Coin Detector and Recognizer - Exam of Computer Vision 2018/2019 UNIPD
+
+    @author Leonardo Sartori (leonardo.sartori.1@studenti.unipp.it)
+    @version 1.0
+*/
+
 #include <Recognizer.h>
 
 using namespace cv;
@@ -8,111 +15,83 @@ Recognizer::Recognizer(string image_path) {
     //Load the image
     this->image_path = image_path;
     this->image = imread(image_path, CV_LOAD_IMAGE_UNCHANGED);
+    this->image_out = this->image.clone();
+
     if (image.empty()) {
         cout << "Error: image not found" << endl;
     }
 
+    //display the image
     namedWindow("Original", WINDOW_NORMAL);
-    imshow("Original", image);
-
-    preprocess();
+    imshow("Original", image_out);
 
 }
 
-void Recognizer::preprocess() {
+
+void Recognizer::preprocess(int choice, string path){
+    switch(choice){
+        case 1:
+            hough_preprocess();
+            break;
+        case 2:{
+            double canny_threshold = 800;
+            double circle_threshold = 0.2;
+            int numIterations = image.size().height * image.size().width / 100;
+            ransac_preproc(path, canny_threshold, circle_threshold, numIterations);
+            break;
+        }
+        default:
+            cout << "Invalid choice, using Hough preprocessing" << endl;
+            hough_preprocess(path);
+            break;
+    }
+}
+
+
+void Recognizer::hough_preprocess(string path) {
 
     Mat img_gray;
     cvtColor(image, img_gray, CV_BGR2GRAY);
 
-    // ------------------------ PREPROCESSING ------------------------
-
-    // GAUSSIAN BLUR: reduce noise
+    // GAUSSIAN BLUR: in order to reduce noise and false circles
     Mat gray_blur;
     GaussianBlur(img_gray, gray_blur, Size(15, 15), 10);
     namedWindow("Blur", WINDOW_NORMAL);
     imshow("Blur", gray_blur);
     waitKey(0);
+    cvDestroyWindow("Blur");
 
+    // Otsu thresholding: to obtain binary image from histogram analysis
     Mat thresh;
-    // ADAPTIVE THRESHOLDING: divides pixels in above or below variable threshold (black or white)
-    // adaptiveThreshold(gray_blur, thresh, 255, ADAPTIVE_THRESH_GAUSSIAN_C, THRESH_BINARY_INV, 11, 1);
-
-    // Otsu thresholding
     double otsu_tresh = threshold(gray_blur, thresh, 0, 255, CV_THRESH_BINARY | CV_THRESH_OTSU);
-
     double high_thresh_val = otsu_tresh, lower_thresh_val = otsu_tresh / 2;
     cout << "high: " << high_thresh_val << " low: " << lower_thresh_val << endl;
+
+    // Alternative to Otsu: adaptive thresholding, divides pixels in above or below variable threshold (black or white)
+    // adaptiveThreshold(gray_blur, thresh, 255, ADAPTIVE_THRESH_GAUSSIAN_C, THRESH_BINARY_INV, 11, 1);
 
     namedWindow("Thresh", WINDOW_NORMAL);
     imshow("Thresh", thresh);
     waitKey(0);
+    cvDestroyWindow("Thresh");
 
-    // Opening
+    // Opening: erosion followed by dilation. It is useful in removing noise
     Mat kernel = Mat::ones(3, 3, CV_8U);
-
     Mat opening;
-
     morphologyEx(thresh, opening, MORPH_OPEN, kernel, Point(-1, -1), 5);
-
-    /*
-    src	Source image. The number of channels can be arbitrary. The depth should be one of CV_8U, CV_16U, CV_16S, CV_32F or CV_64F.
-    dst	Destination image of the same size and type as source image.
-    op	Type of a morphological operation, see cv::MorphTypes
-    kernel	Structuring element. It can be created using cv::getStructuringElement.
-    anchor	Anchor position with the kernel. Negative values mean that the anchor is at the kernel center.
-    iterations	Number of times erosion and dilation are applied.
-    borderType	Pixel extrapolation method, see cv::BorderTypes
-    borderValue	Border value in case of a constant border. The default value has a special meaning.
-    */
     namedWindow("Opening", WINDOW_NORMAL);
     imshow("Opening", opening);
     waitKey(0);
+    cvDestroyWindow("Opening");
 
-    // Canny
-
+    // Canny: edges detector
     Mat edges;
     Canny(img_gray, edges, high_thresh_val * 3, lower_thresh_val * 4, 3, true);
     namedWindow("Canny", WINDOW_NORMAL);
     imshow("Canny", edges);
     waitKey(0);
 
-    // DEBUG
-    // return 0;
-
-    // --------------- CIRCLE DETECTION ----------------------
-
-    // FIND CONTOURS
-    /*
-    // procedure of finding contours in OpenCV as the operation of finding connected components and their boundaries
-    Mat cont_img = closing.clone();
-    vector<vector<Point>> contours;
-    vector<Vec4i> hierarchy;
-    findContours(cont_img, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_NONE);
-
-    for(int i = 0; i < contours.size(); i++){
-      double area = contourArea(contours[i]);
-      // TODO: remove continue
-      if (area < 100)
-          continue;
-
-      if (contours[i].size() < 5)
-          continue;
-      RotatedRect el = fitEllipse(contours[i]);
-      ellipse(image, el, Scalar(0,255,0), 3);
-    }
-    */
-    /*
-    Note that we made a copy of the closing image because the function
-    findContours will change the image passed as the first parameter,
-    we’re also using the RETR_EXTERNAL flag, which means that the contours
-    returned are only the extreme outer contours.
-    The parameter CHAIN_APPROX_SIMPLE will also return a compact
-    representation of the contour
-    */
-
     // HOUGH TRANSFORM
-    vector<Vec3f> coin;
-    // A vector data type to store the details of coins.
 
     int max_radius = min(image.size().height, image.size().width) / 4;
     int min_dist = min(image.size().height, image.size().width) / 5.5;
@@ -121,37 +100,38 @@ void Recognizer::preprocess() {
     // OK for more coins with occlusions
     //HoughCircles(closing,coin,CV_HOUGH_GRADIENT,1,50,1000,10,10,0);
 
-    // OK for first image
     // PERFECT ON 1.jpg:
     //HoughCircles(edges, coin, CV_HOUGH_GRADIENT, 1, 500, high_thresh_val, 10, 100, max_radius);
     // DECENT ON everything
     HoughCircles(edges, coin, CV_HOUGH_GRADIENT, 1.5, min_dist, high_thresh_val * 3, 30, min_radius, max_radius);
 
-    // Argument 1: Input image mode
-    // Argument 2: A vector that stores 3 values: x,y and r for each circle.
-    // Argument 3: CV_HOUGH_GRADIENT: Detection method.
-    // Argument 4: The inverse ratio of resolution.
-    // Argument 5: Minimum distance between centers.
-    // Argument 6: Upper threshold for Canny edge detector.
-    // Argument 7: Threshold for center detection.
-    // Argument 8: Minimum radius to be detected. Put zero as default
-    // Argument 9: Maximum radius to be detected. Put zero as default
-
     cout << "\n The number of coins is: " << coin.size() << "\n\n";
 
-    // todo: remove return
-    if (coin.size() == 0)
-        return;
+    if (coin.size() > 0) {
 
-    // DEBUG
-    for (size_t i = 0; i < coin.size(); i++)
-        cout << i << ": " << coin[i];
+        // DEBUG
+        //for (size_t i = 0; i < coin.size(); i++)
+        //    cout << i << ": " << coin[i];
 
-    // clean the directory used to perform classification by Python script
-    system("exec rm -r images/detect/*");
-    system("exec mkdir images/detect/coins");
+        // clean the directory used to perform classification by Python script
+        String rm = "exec rm -r " + path + "*";
+        system(rm.c_str());
+        String mkdir = "exec mkdir " + path + "coins";
+        system(mkdir.c_str());
 
-    // To draw and save as images the detected circles.
+        // To draw and save as images the detected circles.
+        save_and_draw(path + "coins/");
+
+        // Display circles found
+        namedWindow("Coin Counter", WINDOW_NORMAL);
+        imshow("Coin Counter", image_out);
+        waitKey(0); // Wait for infinite time for a key press.
+
+    }
+}
+
+
+void Recognizer::save_and_draw(string path){
 
     cout << "Saving coins..." << endl;
     for (size_t i = 0; i < coin.size(); i++) {
@@ -160,86 +140,241 @@ void Recognizer::preprocess() {
         // get the radius
         int radius = cvRound(coin[i][2]);
 
-        cout << " Save: center location for circle " << i + 1 << " : " << center << "\n Diameter : " << 2 * radius << "\n";
+        // cout << "Circle " << i + 1 << " : " << center << "\n Diameter : " << 2 * radius << "\n";
 
-        // check if subimages are inside the original image (detect circle can go outside it)
-        int x1 = max(0,center.x - radius);
-        int x2 = max(0,center.y - radius);
+        // check if subimages are inside the original image (detected circle can go outside it)
+        int x1 = max(0, center.x - radius);
+        int x2 = max(0, center.y - radius);
         int x3 = min(image.size().width, center.x + radius);
         int x4 = min(image.size().height, center.y + radius);
 
         // create coin subimage
         Mat single_coin = image(Rect(Point(x1, x2), Point(x3, x4)));
-
         coins_img.push_back(single_coin);
 
         // save the coin frame
-        imwrite("images/detect/coins/" + to_string(i) + ".jpg", single_coin);
+        imwrite(path + to_string(i) + ".jpg", single_coin);
+
+        //Draw circle center
+        circle(image_out, center, 3, Scalar(0, 255, 0), -1, 8, 0);
+        //Draw circle outline.
+        circle(image_out, center, radius, Scalar(0, 0, 255), 3, 8, 0);
 
         //namedWindow("Coin Crop", WINDOW_NORMAL);
         //imshow("Coin Crop", single_coin);
         //waitKey(0);
     }
-
-    // draw circles, this must be done after, otherwise we save images with other circles drawn
-    for (size_t i = 0; i < coin.size(); i++) {
-        Point center(cvRound(coin[i][0]), cvRound(coin[i][1]));
-        // Detect center
-        // cvRound: Rounds floating point number to nearest integer.
-        int radius = cvRound(coin[i][2]);
-        // To get the radius from the second argument of vector coin.
-
-        circle(image, center, 3, Scalar(0, 255, 0), -1, 8, 0);
-        // circle center
-        //  To get the circle outline.
-        circle(image, center, radius, Scalar(0, 0, 255), 3, 8, 0);
-        // circle outline
-    }
-    cout << "\n";
-
-    // -------------- OUTPUT ---------------
-
-    namedWindow("Coin Counter", WINDOW_NORMAL);
-    // Create a window called
-    //"A_good_name".
-    // first argument: name of the window.
-    // second argument: flag- types:
-    // WINDOW_NORMAL : The user can resize the window.
-    // WINDOW_AUTOSIZE : The window size is automatically adjusted to fit the
-    // displayed image() ), and you cannot change the window size manually.
-    // WINDOW_OPENGL : The window will be created with OpenGL support.
-
-    imshow("Coin Counter", image);
-    // first argument: name of the window
-    // second argument: image to be shown(Mat object)
-
-    waitKey(0); // Wait for infinite time for a key press.
 }
 
 
-vector<string> Recognizer::output() {
+void Recognizer::ransac_preproc(string path, double canny_threshold, double circle_threshold, int numIterations)
+{
+    // TODO: remove continue
+
+    // Edge Detection
+    Mat edges;
+    Canny(image, edges, MAX(canny_threshold/2,1), canny_threshold, 3);
+
+    // Create point set from Canny Output
+    vector<Point2d> points;
+    for(int r = 0; r < edges.rows; r++)
+    {
+        for(int c = 0; c < edges.cols; c++)
+        {
+            if(edges.at<unsigned char>(r,c) == 255)
+            {
+                points.push_back(Point2d(c,r));
+            }
+        }
+    }
+
+    // 4 point objects to hold the random samples
+    Point2d pointA;
+    Point2d pointB;
+    Point2d pointC;
+    Point2d pointD;
+
+    // distances between points
+    double AB;
+    double BC;
+    double CA;
+    double DC;
+
+    // varibales for line equations y = mx + b
+    double m_AB;
+    double b_AB;
+    double m_BC;
+    double b_BC;
+
+    // varibles for line midpoints
+    double XmidPoint_AB;
+    double YmidPoint_AB;
+    double XmidPoint_BC;
+    double YmidPoint_BC;
+
+    // variables for perpendicular bisectors
+    double m2_AB;
+    double m2_BC;
+    double b2_AB;
+    double b2_BC;
+
+    // RANSAC
+    RNG rng; // random number generator
+    int min_point_separation = 10; // if points randomly chosen are closer than that, skip them
+    int colinear_tolerance = 1; // make sure points are not on a line
+    int radius_tolerance = 10; // tolerance on points considered on the circumference
+    int points_threshold = 500; // prints warning if we are using a number of total points below that
+    double min_radius = 10; //minimum radius for a circle to not be rejected
+
+    int x,y;
+    Point2d center;
+    double radius;
+
+    // Iterate
+    for(int iteration = 0; iteration < numIterations; iteration++)
+    {
+        //cout << "RANSAC iteration: " << iteration << endl;
+
+        // get 4 random points
+        pointA = points[rng.uniform((int)0, (int)points.size())];
+        pointB = points[rng.uniform((int)0, (int)points.size())];
+        pointC = points[rng.uniform((int)0, (int)points.size())];
+        pointD = points[rng.uniform((int)0, (int)points.size())];
+
+        // calc lines
+        AB = norm(pointA - pointB);
+        BC = norm(pointB - pointC);
+        CA = norm(pointC - pointA);
+        DC = norm(pointD - pointC);
+
+        // one or more random points are too close together
+        if(AB < min_point_separation || BC < min_point_separation || CA < min_point_separation || DC < min_point_separation) continue;
+
+        //find line equations for AB and BC
+        //AB
+        m_AB = (pointB.y - pointA.y) / (pointB.x - pointA.x + 0.000000001); //avoid divide by 0
+        b_AB = pointB.y - m_AB*pointB.x;
+
+        //BC
+        m_BC = (pointC.y - pointB.y) / (pointC.x - pointB.x + 0.000000001); //avoid divide by 0
+        b_BC = pointC.y - m_BC*pointC.x;
+
+
+        //test colinearity (ie the points are not all on the same line)
+        if(abs(pointC.y - (m_AB*pointC.x + b_AB + colinear_tolerance)) < colinear_tolerance) continue;
+
+        //find perpendicular bisector
+        //AB
+        //midpoint
+        XmidPoint_AB = (pointB.x + pointA.x) / 2.0;
+        YmidPoint_AB = m_AB * XmidPoint_AB + b_AB;
+        //perpendicular slope
+        m2_AB = -1.0 / m_AB;
+        //find b2
+        b2_AB = YmidPoint_AB - m2_AB*XmidPoint_AB;
+
+        //BC
+        //midpoint
+        XmidPoint_BC = (pointC.x + pointB.x) / 2.0;
+        YmidPoint_BC = m_BC * XmidPoint_BC + b_BC;
+        //perpendicular slope
+        m2_BC = -1.0 / m_BC;
+        //find b2
+        b2_BC = YmidPoint_BC - m2_BC*XmidPoint_BC;
+
+        //find intersection = circle center
+        x = (b2_AB - b2_BC) / (m2_BC - m2_AB);
+        y = m2_AB * x + b2_AB;
+        center = Point2d(x,y);
+        radius = norm(center - pointB);
+
+        // check if radius is larger enough
+        if (radius < min_radius) continue;
+
+        //check if the 4 point is on the circle
+        if(abs(norm(pointD - center) - radius) > radius_tolerance) continue;
+
+        // vote
+        vector<int> votes;
+        vector<int> no_votes;
+        for(int i = 0; i < (int)points.size(); i++)
+        {
+            double vote_radius = norm(points[i] - center);
+
+            // the point is at distance similar to radius
+            if(abs(vote_radius - radius) < radius_tolerance)
+            {
+                votes.push_back(i);
+            }
+            else
+            {
+                no_votes.push_back(i);
+            }
+        }
+
+        // check votes vs circle_threshold (number of points near the circumference / points on circumference)
+        if( (float)votes.size() / (2.0*CV_PI*radius) >= circle_threshold )
+        {
+            coin.push_back(Vec3f(x,y,radius));
+
+            // remove points from the set so they can't vote on multiple coin
+            vector<Point2d> new_points;
+            for(int i = 0; i < (int)no_votes.size(); i++)
+            {
+                new_points.push_back(points[no_votes[i]]);
+            }
+            points.clear();
+            points = new_points;
+        }
+
+        // stop RANSAC if there are few points left
+        if((int)points.size() < points_threshold)
+            cout << "Too little points remaining, RANSAC unstable: reduce iterations" << endl;
+    }
+
+    cout << "Circles found: " << coin.size() << endl;
+
+    if (coin.size() > 0){
+
+        // clean the directory used to perform classification by Python script
+        String rm = "exec rm -r " + path + "*";
+        system(rm.c_str());
+        String mkdir = "exec mkdir " + path + "coins";
+        system(mkdir.c_str());
+
+        // To draw and save as images the detected circles.
+        save_and_draw(path + "coins/");
+
+        // Display circles found
+        namedWindow("Coin Counter", WINDOW_NORMAL);
+        imshow("Coin Counter", image_out);
+        waitKey(0); // Wait for infinite time for a key press.
+    }
+}
+
+
+vector<string> Recognizer::predict(string path){
 
     if (coins_img.size() == 0){
         cout << "No coins detected, aborting recogniction" << endl;
         return pred;
     }
 
+    // run Python script to creates CSV with predictions, about subimages previously found
     system("python test.py");
     cout << endl;
 
     // read predictions from CSV created by test.py
-
-    ifstream f("images/detect/pred.csv");
+    ifstream f(path + "pred.csv");
     if (!f.is_open()) {
         cout << "error opening file." << endl;
     }
     else{
         string single_pred;
-        while(std::getline(f, single_pred, ',')) {
+        while(getline(f, single_pred, ',')) {
             pred.push_back(single_pred);
         }
     }
 
     return pred;
-
 }
