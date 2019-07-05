@@ -19,13 +19,12 @@ import os
 import csv
 
 INPUT_SIZE = 224
-TRAIN_PATH = 'images/coins-dataset/classified/train'
 
 MODEL_FILENAME = 'model2019-07-02T23:21:44.710661'
 PREDICT_PATH = "images/detect"
 
 # getting list of labels
-LABELS = [i for i in os.listdir(TRAIN_PATH) if os.path.isdir(os.path.join(TRAIN_PATH,i))]
+LABELS = ['10c', '1c', '1e', '20c', '2c', '2e', '50c', '5c', 'unk']
 LABELS.sort()
 print(LABELS)
 

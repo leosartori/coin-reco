@@ -90,7 +90,7 @@ void Recognizer::hough_preprocess(string path) {
 
     // Canny: edges detector
     Mat edges;
-    Canny(img_gray, edges, high_thresh_val * 3, lower_thresh_val * 4, 3, true);
+    Canny(opening, edges, high_thresh_val * 3, lower_thresh_val * 4, 3, true);
     namedWindow("Canny", WINDOW_NORMAL);
     imshow("Canny", edges);
     waitKey(0);
